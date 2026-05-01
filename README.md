@@ -1,4 +1,9 @@
-# React + Vite
+# practice121-web
+Frontend Web
+
+This project is a React + Vite frontend application.
+
+## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
