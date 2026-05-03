@@ -212,6 +212,45 @@ body {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tray-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fullscreen-btn-mini {
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  padding: 0.7rem 1.1rem;
+  border-radius: 12px;
+  color: #c084fc;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.25s ease;
+}
+.fullscreen-btn-mini:hover {
+  background: rgba(168, 85, 247, 0.22);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.25);
+}
+
+@media (max-width: 640px) {
+  .tray-header-actions {
+    width: 100%;
+  }
+  .fullscreen-btn-mini,
+  .tray-header-actions .download-btn-mini {
+    flex: 1;
+    padding: 0.6rem 0.4rem;
+    font-size: 0.7rem;
+  }
 }
 
 .note-display {

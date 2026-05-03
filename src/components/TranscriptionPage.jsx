@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioCaptureService } from '../services/AudioCaptureService';
+import ClinicalNoteFullscreen from './ClinicalNoteFullscreen';
 import './TranscriptionPage.css';
 
 // Pre-loading modern typography for a next-gen feel
@@ -67,14 +68,30 @@ const TranscriptionPage = () => {
 
   const [isTrayOpen, setIsTrayOpen] = useState(false);
   const [isNoteReady, setIsNoteReady] = useState(false);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
-  // Auto-expand tray when note is ready
+  // Auto-expand tray AND auto-open the full-screen view when note is ready.
+  // Tracks the last note we auto-opened for so a re-render doesn't re-open
+  // a fullscreen the user has explicitly closed.
+  const lastAutoOpenedNoteRef = useRef(null);
   useEffect(() => {
     if (processedResponse && !isTrayOpen) {
       setIsTrayOpen(true);
       setIsNoteReady(true);
     }
+    if (processedResponse && lastAutoOpenedNoteRef.current !== processedResponse) {
+      lastAutoOpenedNoteRef.current = processedResponse;
+      setIsFullscreenOpen(true);
+    }
   }, [processedResponse]);
+
+  // The full-screen view's "Accept Amendment" callback — replace the note
+  // in place so subsequent edits/voice commands chain off the new version.
+  const handleAcceptAmendment = useCallback((amendedNote) => {
+    setProcessedResponse(amendedNote);
+    lastAutoOpenedNoteRef.current = amendedNote; // don't re-auto-open
+    setIsFullscreenOpen(false);
+  }, []);
 
   // isRetry=true when called automatically from onerror.
   // CRITICAL: never reset retryCount inside a retry call — that was the bug
@@ -342,9 +359,18 @@ const TranscriptionPage = () => {
                 <>
                   <div className="tray-header">
                     <h3>Processed Clinical Note</h3>
-                    <button className="download-btn-mini" onClick={downloadProcessedNote}>
-                      Download Note
-                    </button>
+                    <div className="tray-header-actions">
+                      <button
+                        className="fullscreen-btn-mini"
+                        onClick={() => setIsFullscreenOpen(true)}
+                        title="Open in full-screen view to amend"
+                      >
+                        ⛶ Open / Amend
+                      </button>
+                      <button className="download-btn-mini" onClick={downloadProcessedNote}>
+                        Download Note
+                      </button>
+                    </div>
                   </div>
                   <div className="note-display scrollbar-styled">
                     {processedResponse.split('\n').map((line, i) => (
@@ -421,6 +447,15 @@ const TranscriptionPage = () => {
         <div className="error-toast">
           ⚠️ {error} <button onClick={() => setError(null)}>✕</button>
         </div>
+      )}
+
+      {isFullscreenOpen && processedResponse && (
+        <ClinicalNoteFullscreen
+          originalNote={processedResponse}
+          modelName={modelName}
+          onClose={() => setIsFullscreenOpen(false)}
+          onAccept={handleAcceptAmendment}
+        />
       )}
     </div>
   );

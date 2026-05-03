@@ -1,0 +1,486 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   ClinicalNoteFullscreen.css
+   Full-screen overlay for viewing / amending a clinical note.
+   Uses the same design tokens (--accent-cyan etc.) as TranscriptionPage.css
+   so it inherits the app's look & feel without needing those declared again
+   here — this file relies on TranscriptionPage.css being loaded first.
+   Mobile-first responsive: side-by-side compare collapses to stacked on
+   narrow viewports, header/actions reflow on phones.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.cn-fs-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 23, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 1000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: clamp(0.5rem, 2vw, 2rem);
+  font-family: 'Inter', sans-serif;
+  animation: cn-fade-in 0.2s ease;
+}
+
+@keyframes cn-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.cn-fs-shell {
+  position: relative;
+  width: 100%;
+  max-width: 1400px;
+  margin: auto;
+  background: linear-gradient(155deg, rgba(15, 22, 51, 0.95) 0%, rgba(8, 12, 32, 0.98) 100%);
+  border: 1px solid rgba(0, 210, 255, 0.18);
+  border-radius: 18px;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(0, 210, 255, 0.4) inset;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 2rem);
+  animation: cn-slide-up 0.25s ease;
+}
+
+@keyframes cn-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+.cn-fs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 210, 255, 0.03);
+}
+
+.cn-fs-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.cn-fs-eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  font-weight: 700;
+  color: var(--accent-cyan, #00d2ff);
+  opacity: 0.75;
+}
+
+.cn-fs-title h2 {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+  font-weight: 600;
+  color: #f1f5ff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cn-fs-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f1f5ff;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.cn-fs-close:hover {
+  background: rgba(255, 77, 77, 0.15);
+  border-color: rgba(255, 77, 77, 0.4);
+  color: #ff6b6b;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+.cn-fs-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.cn-fs-note {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  overflow-y: auto;
+  color: #d8dffb;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.cn-fs-note p {
+  margin: 0 0 0.55rem;
+}
+.cn-fs-note p:empty,
+.cn-fs-note p:has(br:only-child) {
+  margin: 0.4rem 0;
+}
+
+/* ── Actions row ──────────────────────────────────────────────────────── */
+.cn-fs-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.cn-btn {
+  min-width: 140px;
+  padding: 0.7rem 1.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+.cn-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cn-btn-primary {
+  background: linear-gradient(135deg, var(--accent-cyan, #00d2ff) 0%, #0095ff 100%);
+  color: #021022;
+  border-color: rgba(0, 210, 255, 0.6);
+  box-shadow: 0 6px 20px rgba(0, 210, 255, 0.25);
+}
+.cn-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(0, 210, 255, 0.4);
+}
+
+.cn-btn-secondary {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+.cn-btn-secondary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.2);
+  transform: translateY(-1px);
+}
+
+.cn-btn-ghost {
+  background: transparent;
+  color: #a8b2d1;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.cn-btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+  color: #f1f5ff;
+}
+
+/* ── Text edit ────────────────────────────────────────────────────────── */
+.cn-fs-textarea {
+  flex: 1;
+  min-height: 240px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 210, 255, 0.18);
+  border-radius: 12px;
+  color: #f1f5ff;
+  padding: 1rem 1.25rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cn-fs-textarea:focus {
+  border-color: rgba(0, 210, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.12);
+}
+
+/* ── Voice amend panel ────────────────────────────────────────────────── */
+.cn-fs-voice-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 1rem;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.cn-voice-orb {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  box-shadow: 0 0 30px rgba(0, 210, 255, 0.2);
+  transition: all 0.4s ease;
+  flex-shrink: 0;
+}
+.cn-voice-orb.recording {
+  border-color: #ff4d4d;
+  box-shadow: 0 0 50px rgba(255, 77, 77, 0.4);
+  animation: cn-pulse-rec 1.6s ease-in-out infinite;
+}
+.cn-voice-orb.processing {
+  border-color: #f59e0b;
+  box-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+  animation: cn-pulse-proc 1.2s ease-in-out infinite;
+}
+
+@keyframes cn-pulse-rec {
+  0%, 100% { transform: scale(1);    opacity: 0.85; }
+  50%      { transform: scale(1.06); opacity: 1;    }
+}
+@keyframes cn-pulse-proc {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%      { transform: scale(1.04); opacity: 1;   }
+}
+
+.cn-voice-mic-btn {
+  width: 95px;
+  height: 95px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0a1230 0%, #050a20 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--accent-cyan, #00d2ff);
+  font-size: 2.2rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.cn-voice-mic-btn:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+.cn-voice-mic-btn:disabled {
+  cursor: not-allowed;
+}
+.cn-voice-orb.recording .cn-voice-mic-btn {
+  color: #ff6b6b;
+  font-size: 1.8rem;
+}
+
+.cn-voice-hint {
+  margin: 0;
+  text-align: center;
+  color: #a8b2d1;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.cn-voice-transcript {
+  width: 100%;
+  flex: 1;
+  min-height: 80px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: #d8dffb;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.cn-voice-final  { color: #f1f5ff; }
+.cn-voice-interim {
+  color: #06b6d4;
+  font-style: italic;
+  opacity: 0.75;
+}
+.cn-voice-placeholder {
+  color: #6b7494;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* ── Compare ──────────────────────────────────────────────────────────── */
+.cn-compare-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  min-height: 0;
+}
+
+.cn-compare-pane {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+  min-height: 0;
+}
+
+.cn-compare-pane-header {
+  padding: 0.55rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.cn-compare-pane-header.original {
+  background: rgba(168, 85, 247, 0.08);
+  color: #c084fc;
+}
+.cn-compare-pane-header.amended {
+  background: rgba(34, 197, 94, 0.08);
+  color: #4ade80;
+}
+
+.cn-compare-pane-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  color: #d8dffb;
+  line-height: 1.65;
+  font-size: 0.92rem;
+}
+.cn-compare-pane-body p {
+  margin: 0 0 0.5rem;
+}
+
+.cn-compare-command {
+  background: rgba(0, 210, 255, 0.06);
+  border: 1px solid rgba(0, 210, 255, 0.18);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.cn-compare-command-label {
+  color: var(--accent-cyan, #00d2ff);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  align-self: center;
+}
+.cn-compare-command-text {
+  color: #d8dffb;
+  flex: 1;
+  font-style: italic;
+}
+
+/* ── Error toast ──────────────────────────────────────────────────────── */
+.cn-fs-error {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  background: rgba(255, 77, 77, 0.95);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  max-width: calc(100% - 2rem);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+.cn-fs-error button {
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Reuse the app's scrollbar styling without redeclaring it ─────────── */
+/* (.scrollbar-styled is already defined in TranscriptionPage.css) */
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .cn-compare-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .cn-fs-shell {
+    max-height: calc(100vh - 1rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .cn-fs-backdrop {
+    padding: 0;
+  }
+  .cn-fs-shell {
+    border-radius: 0;
+    max-height: 100vh;
+    height: 100vh;
+    max-width: none;
+    border-left: none;
+    border-right: none;
+  }
+  .cn-fs-header {
+    padding: 0.85rem 1rem;
+  }
+  .cn-fs-body {
+    padding: 1rem;
+    gap: 0.85rem;
+  }
+  .cn-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0.7rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  .cn-fs-actions {
+    flex-direction: row;
+  }
+  .cn-voice-orb {
+    width: 110px;
+    height: 110px;
+  }
+  .cn-voice-mic-btn {
+    width: 80px;
+    height: 80px;
+    font-size: 1.9rem;
+  }
+  .cn-fs-title h2 {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .cn-fs-actions {
+    flex-direction: column-reverse;
+  }
+  .cn-btn {
+    width: 100%;
+  }
+}
