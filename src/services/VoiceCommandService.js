@@ -35,12 +35,12 @@ const FULL_COMMAND_TIMEOUT_MS = 6000;
 
 export class VoiceCommandSession {
   constructor({ onInterim, onFinal, onError } = {}) {
-    this.onInterim = onInterim ?? (() => {});
-    this.onFinal   = onFinal   ?? (() => {});
-    this.onError   = onError   ?? (() => {});
+    this.onInterim = onInterim ?? (() => { });
+    this.onFinal = onFinal ?? (() => { });
+    this.onError = onError ?? (() => { });
 
     this.socket = null;
-    this.audio  = null;
+    this.audio = null;
     this.finals = [];
     this._fullCommandResolve = null;
     this._stopped = false;
@@ -75,7 +75,10 @@ export class VoiceCommandSession {
         // Final summary message: { transcript, isFinal: true, fullCommand }
         if (data.fullCommand !== undefined && data.fullCommand !== null) {
           if (this._fullCommandResolve) {
-            this._fullCommandResolve(data.fullCommand);
+            this._fullCommandResolve({
+              fullCommand: data.fullCommand,
+              audioUrl: data.audioUrl
+            });
             this._fullCommandResolve = null;
           }
           return;
@@ -110,7 +113,7 @@ export class VoiceCommandSession {
   // Cleanly stop: silence mic, send STOP, await fullCommand (or timeout),
   // close socket. Returns the best-effort command transcript.
   async stop() {
-    if (this._stopped) return this.finals.join(' ');
+    if (this._stopped) return { fullCommand: this.finals.join(' '), audioUrl: null };
     this._stopped = true;
 
     if (this.audio) {
@@ -118,7 +121,7 @@ export class VoiceCommandSession {
       this.audio = null;
     }
 
-    if (!this.socket) return this.finals.join(' ');
+    if (!this.socket) return { fullCommand: this.finals.join(' '), audioUrl: null };
 
     if (this.socket.readyState === WebSocket.OPEN) {
       const fullCommandPromise = new Promise((resolve) => {
@@ -135,12 +138,16 @@ export class VoiceCommandSession {
 
       try { this.socket.close(1000, 'Voice command finished'); } catch { /* ignore */ }
       this.socket = null;
-      return (result ?? this.finals.join(' ')).trim();
+
+      if (result) {
+        return result;
+      }
+      return { fullCommand: this.finals.join(' ').trim(), audioUrl: null };
     }
 
     try { this.socket.close(); } catch { /* ignore */ }
     this.socket = null;
-    return this.finals.join(' ').trim();
+    return { fullCommand: this.finals.join(' ').trim(), audioUrl: null };
   }
 
   // Force-kill: don't wait for the server response, drop everything.
@@ -148,7 +155,7 @@ export class VoiceCommandSession {
   abort() {
     this._stopped = true;
     if (this.audio) {
-      this.audio.stop().catch(() => {});
+      this.audio.stop().catch(() => { });
       this.audio = null;
     }
     if (this.socket) {

@@ -11,7 +11,7 @@
 .cn-fs-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 23, 0.78);
+  background: rgba(8, 12, 26, 0.82);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   z-index: 1000;
@@ -33,12 +33,12 @@
   width: 100%;
   max-width: 1400px;
   margin: auto;
-  background: linear-gradient(155deg, rgba(15, 22, 51, 0.95) 0%, rgba(8, 12, 32, 0.98) 100%);
-  border: 1px solid rgba(0, 210, 255, 0.18);
+  background: linear-gradient(155deg, rgba(11, 25, 51, 0.96) 0%, rgba(8, 12, 26, 0.99) 100%);
+  border: 1px solid rgba(6, 182, 212, 0.2);
   border-radius: 18px;
   box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.5),
-    0 0 1px rgba(0, 210, 255, 0.4) inset;
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    0 0 1px rgba(6, 182, 212, 0.3) inset;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -105,6 +105,42 @@
   background: rgba(255, 77, 77, 0.15);
   border-color: rgba(255, 77, 77, 0.4);
   color: #ff6b6b;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+.cn-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  width: fit-content;
+  margin-bottom: 0.25rem;
+}
+
+.cn-tab-btn {
+  background: transparent;
+  border: none;
+  color: #a8b2d1;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cn-tab-btn:hover {
+  color: #f1f5ff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cn-tab-btn.active {
+  color: #021022;
+  background: var(--accent-cyan, #00d2ff);
+  box-shadow: 0 4px 12px rgba(0, 210, 255, 0.2);
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────── */

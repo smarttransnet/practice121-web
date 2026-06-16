@@ -1,15 +1,15 @@
 :root {
-  --bg-dark: #0f0c29; /* Deep space indigo */
-  --bg-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-  --panel-glass: rgba(15, 12, 41, 0.7);
-  --border-glass: rgba(0, 210, 255, 0.2);
-  --accent-cyan: #00d2ff;
-  --accent-purple: #9d50bb;
-  --accent-gradient: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
-  --hub-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  --text-main: #e0e0e0;
-  --text-muted: #8e9eab;
-  --glow-cyan: 0 0 20px rgba(0, 210, 255, 0.5);
+  --bg-dark: #0B1020; /* Matches mobile darkSurface */
+  --bg-gradient: linear-gradient(135deg, #0B1020 0%, #111933 50%, #080C1A 100%);
+  --panel-glass: rgba(11, 16, 32, 0.8);
+  --border-glass: rgba(6, 182, 212, 0.25);
+  --accent-cyan: #06B6D4; /* Matches mobile accent */
+  --accent-purple: #A855F7; /* Matches mobile sparkle */
+  --accent-gradient: linear-gradient(135deg, #06B6D4 0%, #4F46E5 100%);
+  --hub-gradient: linear-gradient(135deg, #0B1020 0%, #111933 100%);
+  --text-main: #F1F5FF;
+  --text-muted: #A0A8C7; /* Matches mobile darkOnSurfaceMuted */
+  --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.4);
 }
 
 * {
@@ -51,7 +51,7 @@ body {
 .logo h1 {
   font-size: 1rem;
   font-weight: 800;
-  background: linear-gradient(to right, #00d2ff, #fff);
+  background: linear-gradient(to right, var(--accent-cyan), #fff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.02em;
