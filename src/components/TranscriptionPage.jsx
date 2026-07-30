@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioCaptureService } from '../services/AudioCaptureService';
+import { advanceNextPatient } from '../services/QueueService';
 import ClinicalNoteFullscreen from './ClinicalNoteFullscreen';
 import './TranscriptionPage.css';
 
@@ -23,13 +24,16 @@ const TranscriptionPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [visualizerData, setVisualizerData] = useState(new Array(20).fill(20));
+  const [activePatient, setActivePatient] = useState(null);
+  const [isAdvancingQueue, setIsAdvancingQueue] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   const socketRef = useRef(null);
   const audioServiceRef = useRef(null);
   const animationFrameRef = useRef(null);
   const smoothedVisualizerRef = useRef(new Array(20).fill(12));
-  const retryCount    = useRef(0);
-  const maxRetries    = 3;
+  const retryCount = useRef(0);
+  const maxRetries = 3;
   const isRetryingRef = useRef(false); // true while a retry setTimeout is pending
   const retryTimerRef = useRef(null);  // timer ID so we can cancel on manual stop
 
@@ -104,10 +108,10 @@ const TranscriptionPage = () => {
       // ── Dispose any lingering prior session ───────────────────────────────
       if (socketRef.current) {
         try {
-          socketRef.current.onopen    = null;
+          socketRef.current.onopen = null;
           socketRef.current.onmessage = null;
-          socketRef.current.onerror   = null;
-          socketRef.current.onclose   = null;
+          socketRef.current.onerror = null;
+          socketRef.current.onclose = null;
           if (
             socketRef.current.readyState === WebSocket.OPEN ||
             socketRef.current.readyState === WebSocket.CONNECTING
@@ -141,13 +145,13 @@ const TranscriptionPage = () => {
       setError(null);
       setStatus(isRetry ? `Reconnecting (${retryCount.current}/${maxRetries})…` : 'Connecting…');
 
-      // const wsUrl = import.meta.env.DEV
-      //   ? 'wss://localhost:44324/ws/transcribe'
-      //   : 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe';
-
-        const wsUrl = import.meta.env.DEV
-        ? 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe'
+      const wsUrl = import.meta.env.DEV
+        ? 'wss://localhost:44324/ws/transcribe'
         : 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe';
+
+      // const wsUrl = import.meta.env.DEV
+      // ? 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe'
+      // : 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe';
 
       socketRef.current = new WebSocket(wsUrl);
 
@@ -258,7 +262,7 @@ const TranscriptionPage = () => {
         socketRef.current = null;
       }
       if (audioServiceRef.current) {
-        audioServiceRef.current.stop().catch(() => {});
+        audioServiceRef.current.stop().catch(() => { });
         audioServiceRef.current = null;
       }
       if (animationFrameRef.current) {
@@ -272,7 +276,7 @@ const TranscriptionPage = () => {
       // stop() is async (awaits audioContext.close) but we can't await here
       // since stopStreaming is synchronous.  The nodes are silenced immediately
       // inside stop() before any async work, so no stale audio chunks fire.
-      audioServiceRef.current.stop().catch(() => {});
+      audioServiceRef.current.stop().catch(() => { });
       audioServiceRef.current = null;
     }
 
@@ -311,6 +315,39 @@ const TranscriptionPage = () => {
     }
   };
 
+  const handleNextPatient = async () => {
+    if (isAdvancingQueue) return;
+    setIsAdvancingQueue(true);
+    try {
+      const doctorId = localStorage.getItem('doctorId') || '80d02763-e924-4889-9729-f9c6eaf9b5ea';
+      const practiceCentreId = localStorage.getItem('practiceCentreId') || '84f24dc8-ccb4-4ea4-8db3-dfe03e4a445f';
+
+      const data = await advanceNextPatient({ doctorId, practiceCentreId });
+
+      if (data?.hasNextPatient && data?.activePatient) {
+        setActivePatient(data.activePatient);
+        setToastMessage(`Now consulting #${data.activePatient.queueNumber}: ${data.activePatient.patientName}`);
+      } else {
+        setActivePatient(null);
+        setToastMessage(data?.completedPatient
+          ? `Finalized consultation for ${data.completedPatient.patientName}. Queue is now empty.`
+          : 'Queue is currently empty.');
+      }
+
+      if (isRecording) {
+        stopStreaming();
+      }
+      setProcessedResponse('');
+      setFinalTranscripts([]);
+      setFullTranscript('');
+      setInterimTranscript('');
+    } catch (err) {
+      setError(err.message || 'Failed to advance next patient.');
+    } finally {
+      setIsAdvancingQueue(false);
+    }
+  };
+
   const downloadProcessedNote = () => {
     if (!processedResponse) return;
     const text = "Note365 Processed Clinical Note\n" +
@@ -333,6 +370,14 @@ const TranscriptionPage = () => {
           <h1>Note365</h1>
         </div>
         <div className="header-status">
+          <button
+            className="next-patient-btn"
+            onClick={handleNextPatient}
+            disabled={isAdvancingQueue}
+            title="Finalize active consultation and advance to the next patient"
+          >
+            {isAdvancingQueue ? 'Advancing...' : '⏭ Next Patient'}
+          </button>
           <div className={`recording-status-modern ${isRecording ? 'active' : ''}`}>
             {isRecording ? 'LIVE SESSION' : isProcessing ? 'GENERATING...' : 'STANDBY'}
           </div>
@@ -397,6 +442,17 @@ const TranscriptionPage = () => {
 
           {/* Center: Controls */}
           <section className="controls-panel">
+            {activePatient && (
+              <div className="active-patient-banner">
+                <div className="patient-number-badge">#{activePatient.queueNumber}</div>
+                <div className="patient-info-meta">
+                  <span className="patient-name-title">{activePatient.patientName}</span>
+                  <span className="patient-mobile-sub">{activePatient.patientMobile}</span>
+                </div>
+                <div className="patient-status-chip">IN CONSULTATION</div>
+              </div>
+            )}
+
             <div className="visualizer-container">
               {visualizerData.map((h, i) => (
                 <div key={i} className="vis-bar" style={{ '--level': `${h / 100}` }} />
@@ -442,6 +498,12 @@ const TranscriptionPage = () => {
         </div>
         {/* Removed 'Don't type anything' input as requested */}
       </div>
+
+      {toastMessage && (
+        <div className="info-toast">
+          ℹ️ {toastMessage} <button onClick={() => setToastMessage(null)}>✕</button>
+        </div>
+      )}
 
       {error && (
         <div className="error-toast">
