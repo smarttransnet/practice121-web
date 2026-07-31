@@ -319,8 +319,11 @@ const TranscriptionPage = () => {
     if (isAdvancingQueue) return;
     setIsAdvancingQueue(true);
     try {
-      const doctorId = localStorage.getItem('doctorId') || '80d02763-e924-4889-9729-f9c6eaf9b5ea';
-      const practiceCentreId = localStorage.getItem('practiceCentreId') || '84f24dc8-ccb4-4ea4-8db3-dfe03e4a445f';
+      const urlParams = new URLSearchParams(window.location.search);
+      const doctorId = urlParams.get('doctorId') || localStorage.getItem('doctorId') || '80d02763-e924-4889-9729-f9c6eaf9b5ea';
+      const practiceCentreId = urlParams.get('practiceCentreId') || localStorage.getItem('practiceCentreId') || '84f24dc8-ccb4-4ea4-8db3-dfe03e4a445f';
+      if (urlParams.get('doctorId')) localStorage.setItem('doctorId', urlParams.get('doctorId'));
+      if (urlParams.get('practiceCentreId')) localStorage.setItem('practiceCentreId', urlParams.get('practiceCentreId'));
 
       const data = await advanceNextPatient({ doctorId, practiceCentreId });
 
