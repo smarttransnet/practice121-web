@@ -13,6 +13,6 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Add this 'base' property
-  base: 'https://storage.googleapis.com/note366-stt-frontend-dev/',
+  // Local dev serves from root; production deploy can override via build flag.
+  base: '/',
 })
