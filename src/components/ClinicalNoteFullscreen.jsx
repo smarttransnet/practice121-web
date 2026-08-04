@@ -16,15 +16,46 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { amendClinicalNote } from '../services/NoteAmendService';
+import { amendClinicalNote, sendClinicalNoteEmail, sendClinicalNoteSms } from '../services/NoteAmendService';
 import { VoiceCommandSession } from '../services/VoiceCommandService';
 import './ClinicalNoteFullscreen.css';
 
 const renderNote = (text) =>
   (text || '').split('\n').map((line, i) => <p key={i}>{line || <br />}</p>);
 
-const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) => {
+const extractPrescription = (note) => {
+  if (!note) return 'No prescription found.';
+
+  const headerPattern = /\*\*DOCTOR PRESCRIPTION\*\*/i;
+  const match = note.match(headerPattern);
+
+  if (!match) {
+    // Fallback to just the text without asterisks
+    const plainIndex = note.toUpperCase().indexOf('DOCTOR PRESCRIPTION');
+    if (plainIndex === -1) return 'No prescription found.';
+
+    const start = plainIndex + 'DOCTOR PRESCRIPTION'.length;
+    const nextHeadingIndex = note.indexOf('**', start);
+    if (nextHeadingIndex === -1) {
+      return note.substring(start).trim();
+    } else {
+      return note.substring(start, nextHeadingIndex).trim();
+    }
+  }
+
+  const start = match.index + match[0].length;
+  const nextHeadingIndex = note.indexOf('**', start);
+
+  if (nextHeadingIndex === -1) {
+    return note.substring(start).trim();
+  } else {
+    return note.substring(start, nextHeadingIndex).trim();
+  }
+};
+
+const ClinicalNoteFullscreen = ({ originalNote, modelName, activePatient, onClose, onAccept, onFinishConsultation }) => {
   const [mode, setMode] = useState('view');
+  const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'prescription'
   const [editedText, setEditedText] = useState(originalNote);
   const [amendedNote, setAmendedNote] = useState('');
   const [voiceCommand, setVoiceCommand] = useState('');
@@ -32,8 +63,30 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [smsMsg, setSmsMsg] = useState(null);
 
   const sessionRef = useRef(null);
+
+  const handleSendSmsPrescription = async () => {
+    const prescription = extractPrescription(editedText || originalNote);
+    const targetMobile = activePatient?.patientMobile || '0775706080';
+    setIsSendingSms(true);
+    setSmsMsg(null);
+    setError(null);
+    try {
+      await sendClinicalNoteSms({
+        mobileNumber: targetMobile,
+        body: `Prescription:\n${prescription}\n\nThank you,\nPractice121\n`
+      });
+      setSmsMsg(`Prescription SMS sent to ${targetMobile}`);
+    } catch (err) {
+      setError(err.message || 'Failed to send SMS');
+    } finally {
+      setIsSendingSms(false);
+    }
+  };
 
   // Lock background scroll while the overlay is open.
   useEffect(() => {
@@ -53,12 +106,12 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
     };
   }, []);
 
-  // Keep editedText in sync if a brand-new note is loaded into the overlay.
   useEffect(() => {
     setEditedText(originalNote);
     setAmendedNote('');
     setVoiceCommand('');
     setInterim('');
+    setAudioUrl(null);
     setMode('view');
   }, [originalNote]);
 
@@ -106,7 +159,9 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
     setIsRecording(false);
     setIsProcessing(true);
     try {
-      const command = (await sessionRef.current.stop()) || voiceCommand;
+      const result = await sessionRef.current.stop();
+      const command = result?.fullCommand || voiceCommand;
+      const url = result?.audioUrl;
       sessionRef.current = null;
 
       if (!command || !command.trim()) {
@@ -117,6 +172,7 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
       }
 
       setVoiceCommand(command);
+      setAudioUrl(url);
       const amended = await amendClinicalNote({
         originalNote,
         command,
@@ -145,7 +201,29 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
   };
 
   // ─── Compare ────────────────────────────────────────────────────────────
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (audioUrl) {
+      try {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const timestamp = `${day}/${month}/${year} ${hour}:${minute}`;
+
+        const prescription = extractPrescription(amendedNote);
+        const emailBody = `- Original Note -\n${originalNote}\n\n- Amendments -\n${voiceCommand}\n\n- Prescription -\n${prescription}\n\n- Session -\n${audioUrl}`;
+
+        await sendClinicalNoteEmail({
+          toEmail: 'mihipal@gmail.com',
+          subject: `Edited Recording - Session and ${timestamp}`,
+          body: emailBody,
+        });
+      } catch (err) {
+        console.error('Failed to send edited recording email:', err);
+      }
+    }
     onAccept(amendedNote);
   };
 
@@ -153,16 +231,17 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
     setAmendedNote('');
     setVoiceCommand('');
     setInterim('');
+    setAudioUrl(null);
     setEditedText(originalNote);
     setMode('view');
   };
 
   // ─── Header label per mode ──────────────────────────────────────────────
   const modeLabel =
-    mode === 'edit-text'    ? 'Text Edit'
-    : mode === 'voice-amend' ? (isRecording ? 'Voice Amend — Recording' : isProcessing ? 'Voice Amend — Amending…' : 'Voice Amend')
-    : mode === 'compare'     ? 'Review Amendment'
-    :                          'Clinical Note';
+    mode === 'edit-text' ? 'Text Edit'
+      : mode === 'voice-amend' ? (isRecording ? 'Voice Amend — Recording' : isProcessing ? 'Voice Amend — Amending…' : 'Voice Amend')
+        : mode === 'compare' ? 'Review Amendment'
+          : 'Clinical Note';
 
   return (
     <div className="cn-fs-backdrop" role="dialog" aria-modal="true" aria-label="Clinical note full screen">
@@ -180,16 +259,47 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
           {/* ── VIEW ──────────────────────────────────────────────────── */}
           {mode === 'view' && (
             <>
-              <div className="cn-fs-note scrollbar-styled">
-                {renderNote(originalNote)}
+              <div className="cn-tabs">
+                <button
+                  className={`cn-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  NOTES
+                </button>
+                <button
+                  className={`cn-tab-btn ${activeTab === 'prescription' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('prescription')}
+                >
+                  PRESCRIPTION
+                </button>
               </div>
-              <div className="cn-fs-actions">
+
+              <div className="cn-fs-note scrollbar-styled">
+                {activeTab === 'notes'
+                  ? renderNote(originalNote)
+                  : renderNote(extractPrescription(originalNote))
+                }
+              </div>
+              {smsMsg && (
+                <div style={{ margin: '8px 0', padding: '10px 14px', background: '#dcfce7', color: '#15803d', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  ✓ {smsMsg}
+                </div>
+              )}
+              <div className="cn-fs-actions" style={{ flexWrap: 'wrap', gap: '8px' }}>
                 <button className="cn-btn cn-btn-secondary" onClick={handleStartTextEdit}>
                   ✎ Text Edit
                 </button>
                 <button className="cn-btn cn-btn-primary" onClick={handleStartVoice}>
                   🎙 Voice Command
                 </button>
+                <button className="cn-btn cn-btn-secondary" onClick={handleSendSmsPrescription} disabled={isSendingSms}>
+                  {isSendingSms ? 'Sending SMS...' : '📱 Send SMS Prescription'}
+                </button>
+                {onFinishConsultation && (
+                  <button className="cn-btn" style={{ background: '#22c55e', color: '#fff', fontWeight: 'bold' }} onClick={onFinishConsultation}>
+                    ✓ Finish Consultation
+                  </button>
+                )}
               </div>
             </>
           )}

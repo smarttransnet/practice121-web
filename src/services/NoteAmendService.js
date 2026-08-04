@@ -48,3 +48,48 @@ export async function amendClinicalNote({ originalNote, command, modelName }) {
   }
   return data.amendedNote;
 }
+
+export async function sendClinicalNoteEmail({ toEmail, subject, body }) {
+  const response = await fetch(`${baseUrl}/notes/email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      toEmail,
+      subject,
+      body,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `Email request failed (${response.status}).`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.error) message = errBody.error;
+      else if (errBody?.detail) message = errBody.detail;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return await response.json();
+}
+
+export async function sendClinicalNoteSms({ mobileNumber, body }) {
+  const response = await fetch(`${baseUrl}/notes/sms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mobileNumber,
+      body,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `SMS request failed (${response.status}).`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.error) message = errBody.error;
+      else if (errBody?.detail) message = errBody.detail;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return await response.json();
+}
