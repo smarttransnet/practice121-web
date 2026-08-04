@@ -88,6 +88,8 @@ export class AudioCaptureService {
     this._workletNode  = null;
     this._scriptNode   = null;
     this._blobUrl      = null; // tracked so we can revoke it on stop()
+    this._onVisibility = null;
+    this._onStateChange = null;
   }
 
   async start() {
@@ -101,6 +103,23 @@ export class AudioCaptureService {
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
+
+    // Screen lock / tab backgrounding suspends AudioContext and silently
+    // stops PCM frames. Resume as soon as the page is visible again, and
+    // also whenever the context reports a suspend on its own.
+    this._onStateChange = () => {
+      if (this.audioContext?.state === 'suspended') {
+        this.resumeIfNeeded().catch(() => {});
+      }
+    };
+    this.audioContext.addEventListener('statechange', this._onStateChange);
+
+    this._onVisibility = () => {
+      if (!document.hidden) {
+        this.resumeIfNeeded().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', this._onVisibility);
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -136,6 +155,15 @@ export class AudioCaptureService {
       `| context sampleRate: ${this.audioContext.sampleRate} Hz`,
       `| context state: ${this.audioContext.state}`
     );
+  }
+
+  /** Resume a suspended AudioContext (common after screen lock / tab hide). */
+  async resumeIfNeeded() {
+    if (!this.audioContext || this.audioContext.state === 'closed') return;
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+      console.log('[AudioCaptureService] AudioContext resumed after suspend');
+    }
   }
 
   // ── AudioWorklet (preferred) ───────────────────────────────────────────────
@@ -220,6 +248,11 @@ export class AudioCaptureService {
   // only 1-2 words": the old AudioContext was still closing while the new one
   // was already created, causing Chrome's internal resampler to get confused.
   async stop() {
+    if (this._onVisibility) {
+      document.removeEventListener('visibilitychange', this._onVisibility);
+      this._onVisibility = null;
+    }
+
     // 1. Silence the worklet/script node first so no stale audio chunks fire
     //    onAudioData callbacks after we start tearing down.
     if (this._workletNode) {
@@ -252,6 +285,10 @@ export class AudioCaptureService {
     // 3. Await the AudioContext close so Chrome fully releases the resampler
     //    and audio thread before the next session creates a new context.
     if (this.audioContext) {
+      if (this._onStateChange) {
+        this.audioContext.removeEventListener('statechange', this._onStateChange);
+        this._onStateChange = null;
+      }
       try { await this.audioContext.close(); } catch { /* already closed */ }
       this.audioContext = null;
     }

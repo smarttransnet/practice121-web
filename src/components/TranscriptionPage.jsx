@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioCaptureService } from '../services/AudioCaptureService';
+import { getMedicineStopPayload } from '../data/medicinePhonetics';
 import ClinicalNoteFullscreen from './ClinicalNoteFullscreen';
 import './TranscriptionPage.css';
 
@@ -32,6 +33,51 @@ const TranscriptionPage = () => {
   const maxRetries    = 3;
   const isRetryingRef = useRef(false); // true while a retry setTimeout is pending
   const retryTimerRef = useRef(null);  // timer ID so we can cancel on manual stop
+  const wakeLockRef = useRef(null);
+  const isRecordingRef = useRef(false);
+
+  // Keep a live ref so visibility / wake-lock handlers never read a stale
+  // isRecording value from a closed-over render.
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      await wakeLockRef.current?.release();
+    } catch { /* already released */ }
+    wakeLockRef.current = null;
+  }, []);
+
+  // Keep the display awake during live capture. Without this, screen-off
+  // suspends AudioContext / mic and the session effectively dies mid-consult.
+  const acquireWakeLock = useCallback(async () => {
+    if (!('wakeLock' in navigator) || !isRecordingRef.current) return;
+    try {
+      // Always drop a stale sentinel before requesting a fresh one.
+      await releaseWakeLock();
+      wakeLockRef.current = await navigator.wakeLock.request('screen');
+      wakeLockRef.current.addEventListener('release', () => {
+        // Browser releases the lock when the tab is hidden or the OS sleeps
+        // the display — we re-request on the next visibilitychange.
+        if (wakeLockRef.current) wakeLockRef.current = null;
+      });
+      console.log('[wake-lock] screen wake lock acquired');
+    } catch (err) {
+      console.warn('[wake-lock] could not acquire:', err?.message || err);
+    }
+  }, [releaseWakeLock]);
+
+  // Re-acquire wake lock + resume AudioContext after unlock / tab focus.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden || !isRecordingRef.current) return;
+      acquireWakeLock();
+      audioServiceRef.current?.resumeIfNeeded?.().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [acquireWakeLock]);
 
   // Animate waveform
   const updateVisualizer = () => {
@@ -141,12 +187,8 @@ const TranscriptionPage = () => {
       setError(null);
       setStatus(isRetry ? `Reconnecting (${retryCount.current}/${maxRetries})…` : 'Connecting…');
 
-      // const wsUrl = import.meta.env.DEV
-      //   ? 'wss://localhost:44324/ws/transcribe'
-      //   : 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe';
-
-        const wsUrl = import.meta.env.DEV
-        ? 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe'
+      const wsUrl = import.meta.env.DEV
+        ? 'wss://localhost:44324/ws/transcribe'
         : 'wss://note365-stt-api-687271578749.asia-southeast1.run.app/ws/transcribe';
 
       socketRef.current = new WebSocket(wsUrl);
@@ -154,6 +196,7 @@ const TranscriptionPage = () => {
       socketRef.current.onopen = () => {
         setStatus('Streaming');
         setIsRecording(true);
+        isRecordingRef.current = true;
         retryCount.current = 0;
         const trimmedPrompt = customPrompt.trim();
         const trimmedModel = modelName.trim();
@@ -162,6 +205,7 @@ const TranscriptionPage = () => {
           ...(trimmedModel ? { model: trimmedModel } : {}),
         };
         socketRef.current.send(JSON.stringify(config));
+        acquireWakeLock();
       };
 
       socketRef.current.onmessage = (event) => {
@@ -232,6 +276,8 @@ const TranscriptionPage = () => {
         if (!isRetryingRef.current) {
           setStatus('Ready');
           setIsRecording(false);
+          isRecordingRef.current = false;
+          releaseWakeLock();
         }
       };
 
@@ -245,7 +291,7 @@ const TranscriptionPage = () => {
       setError('Could not access microphone.');
       setStatus('Error');
     }
-  }, [customPrompt, modelName]);
+  }, [customPrompt, modelName, acquireWakeLock, releaseWakeLock]);
 
   useEffect(() => {
     return () => {
@@ -264,8 +310,9 @@ const TranscriptionPage = () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      releaseWakeLock();
     };
-  }, []);
+  }, [releaseWakeLock]);
 
   const stopStreaming = useCallback(() => {
     if (audioServiceRef.current) {
@@ -276,8 +323,20 @@ const TranscriptionPage = () => {
       audioServiceRef.current = null;
     }
 
+    // Manual stop should update the UI immediately. Waiting for the server to
+    // close the socket leaves the page stuck looking "live" even though the
+    // microphone has already been torn down on the client.
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    releaseWakeLock();
+
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send("STOP");
+      // Send medicines with STOP so Gemini can map Sinhala STT phonetics
+      // to verified drug names when generating the clinical note.
+      socketRef.current.send(JSON.stringify({
+        type: 'STOP',
+        medicines: getMedicineStopPayload(),
+      }));
       setIsProcessing(true);
       setStatus('Processing...');
       // NOTE: Do NOT clear interimTranscript here. The server synthesizes a
@@ -291,7 +350,7 @@ const TranscriptionPage = () => {
       setStatus('Ready');
       setInterimTranscript('');
     }
-  }, []);
+  }, [releaseWakeLock]);
 
   const handleToggle = () => {
     // Block restart while Gemini is still generating the note for the previous
