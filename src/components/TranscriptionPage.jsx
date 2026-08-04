@@ -375,11 +375,12 @@ const TranscriptionPage = () => {
         <div className="header-status">
           <button
             className="next-patient-btn"
+            style={{ backgroundColor: '#22c55e', borderColor: '#16a34a' }}
             onClick={handleNextPatient}
             disabled={isAdvancingQueue}
-            title="Finalize active consultation and advance to the next patient"
+            title="Mark consultation completed and advance to the next patient"
           >
-            {isAdvancingQueue ? 'Advancing...' : '⏭ Next Patient'}
+            {isAdvancingQueue ? 'Completing...' : '✓ Finish Consultation'}
           </button>
           <div className={`recording-status-modern ${isRecording ? 'active' : ''}`}>
             {isRecording ? 'LIVE SESSION' : isProcessing ? 'GENERATING...' : 'STANDBY'}
@@ -518,8 +519,13 @@ const TranscriptionPage = () => {
         <ClinicalNoteFullscreen
           originalNote={processedResponse}
           modelName={modelName}
+          activePatient={activePatient}
           onClose={() => setIsFullscreenOpen(false)}
           onAccept={handleAcceptAmendment}
+          onFinishConsultation={() => {
+            setIsFullscreenOpen(false);
+            handleNextPatient();
+          }}
         />
       )}
     </div>

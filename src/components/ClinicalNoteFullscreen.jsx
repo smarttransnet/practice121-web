@@ -16,7 +16,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { amendClinicalNote, sendClinicalNoteEmail } from '../services/NoteAmendService';
+import { amendClinicalNote, sendClinicalNoteEmail, sendClinicalNoteSms } from '../services/NoteAmendService';
 import { VoiceCommandSession } from '../services/VoiceCommandService';
 import './ClinicalNoteFullscreen.css';
 
@@ -53,7 +53,7 @@ const extractPrescription = (note) => {
   }
 };
 
-const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) => {
+const ClinicalNoteFullscreen = ({ originalNote, modelName, activePatient, onClose, onAccept, onFinishConsultation }) => {
   const [mode, setMode] = useState('view');
   const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'prescription'
   const [editedText, setEditedText] = useState(originalNote);
@@ -64,8 +64,29 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [smsMsg, setSmsMsg] = useState(null);
 
   const sessionRef = useRef(null);
+
+  const handleSendSmsPrescription = async () => {
+    const prescription = extractPrescription(editedText || originalNote);
+    const targetMobile = activePatient?.patientMobile || '0775706080';
+    setIsSendingSms(true);
+    setSmsMsg(null);
+    setError(null);
+    try {
+      await sendClinicalNoteSms({
+        mobileNumber: targetMobile,
+        body: `Prescription:\n${prescription}\n\nThank you,\nPractice121\n`
+      });
+      setSmsMsg(`Prescription SMS sent to ${targetMobile}`);
+    } catch (err) {
+      setError(err.message || 'Failed to send SMS');
+    } finally {
+      setIsSendingSms(false);
+    }
+  };
 
   // Lock background scroll while the overlay is open.
   useEffect(() => {
@@ -259,13 +280,26 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, onClose, onAccept }) 
                   : renderNote(extractPrescription(originalNote))
                 }
               </div>
-              <div className="cn-fs-actions">
+              {smsMsg && (
+                <div style={{ margin: '8px 0', padding: '10px 14px', background: '#dcfce7', color: '#15803d', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  ✓ {smsMsg}
+                </div>
+              )}
+              <div className="cn-fs-actions" style={{ flexWrap: 'wrap', gap: '8px' }}>
                 <button className="cn-btn cn-btn-secondary" onClick={handleStartTextEdit}>
                   ✎ Text Edit
                 </button>
                 <button className="cn-btn cn-btn-primary" onClick={handleStartVoice}>
                   🎙 Voice Command
                 </button>
+                <button className="cn-btn cn-btn-secondary" onClick={handleSendSmsPrescription} disabled={isSendingSms}>
+                  {isSendingSms ? 'Sending SMS...' : '📱 Send SMS Prescription'}
+                </button>
+                {onFinishConsultation && (
+                  <button className="cn-btn" style={{ background: '#22c55e', color: '#fff', fontWeight: 'bold' }} onClick={onFinishConsultation}>
+                    ✓ Finish Consultation
+                  </button>
+                )}
               </div>
             </>
           )}

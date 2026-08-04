@@ -71,3 +71,25 @@ export async function sendClinicalNoteEmail({ toEmail, subject, body }) {
   }
   return await response.json();
 }
+
+export async function sendClinicalNoteSms({ mobileNumber, body }) {
+  const response = await fetch(`${baseUrl}/notes/sms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mobileNumber,
+      body,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `SMS request failed (${response.status}).`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.error) message = errBody.error;
+      else if (errBody?.detail) message = errBody.detail;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return await response.json();
+}
