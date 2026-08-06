@@ -18,6 +18,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { amendClinicalNote, sendClinicalNoteEmail, sendClinicalNoteSms } from '../services/NoteAmendService';
 import { VoiceCommandSession } from '../services/VoiceCommandService';
+import PrescriptionGrid, { parsePrescriptionRaw, formatItemToSentence, sanitizeToAscii } from './PrescriptionGrid';
 import './ClinicalNoteFullscreen.css';
 
 const renderNote = (text) =>
@@ -70,7 +71,9 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, activePatient, onClos
   const sessionRef = useRef(null);
 
   const handleSendSmsPrescription = async () => {
-    const prescription = extractPrescription(editedText || originalNote);
+    const rawPrescription = extractPrescription(editedText || originalNote);
+    const parsedItems = parsePrescriptionRaw(rawPrescription);
+    const asciiPrescription = parsedItems.map(formatItemToSentence).filter(Boolean).map(sanitizeToAscii).join('\n') || sanitizeToAscii(rawPrescription);
     const targetMobile = activePatient?.patientMobile || '0775706080';
     setIsSendingSms(true);
     setSmsMsg(null);
@@ -78,7 +81,7 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, activePatient, onClos
     try {
       await sendClinicalNoteSms({
         mobileNumber: targetMobile,
-        body: `Prescription:\n${prescription}\n\nThank you,\nPractice121\n`
+        body: `Prescription:\n${asciiPrescription}\n\nThank you,\nPractice121\n`
       });
       setSmsMsg(`Prescription SMS sent to ${targetMobile}`);
     } catch (err) {
@@ -275,10 +278,13 @@ const ClinicalNoteFullscreen = ({ originalNote, modelName, activePatient, onClos
               </div>
 
               <div className="cn-fs-note scrollbar-styled">
-                {activeTab === 'notes'
-                  ? renderNote(originalNote)
-                  : renderNote(extractPrescription(originalNote))
-                }
+                {activeTab === 'notes' ? (
+                  renderNote(originalNote)
+                ) : (
+                  <PrescriptionGrid
+                    initialRawPrescription={extractPrescription(originalNote)}
+                  />
+                )}
               </div>
               {smsMsg && (
                 <div style={{ margin: '8px 0', padding: '10px 14px', background: '#dcfce7', color: '#15803d', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}>
